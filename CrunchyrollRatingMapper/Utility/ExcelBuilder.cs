@@ -2,33 +2,75 @@
 using CrunchyrollRatingMapper.DTOs;
 
 namespace CrunchyrollRatingMapper.Utility;
-
-public class ExcelBuilder
+public static class ExcelBuilder
 {
-    public static void BuildExcel(
-    List<AnimeInfo> currentAnimes)
+    public static void BuildExcel(List<AnimeInfo> currentAnimes)
     {
-        using var wbook = new XLWorkbook();
-        var ws = wbook.AddWorksheet("Sheet1");
+        string outputDirectory = Path.Combine(
+            AppContext.BaseDirectory,
+            "Exports");
 
-        ws.Cell("A1").Value = "CrunchyRoll Id";
-        ws.Cell("B1").Value = "Title";
-        ws.Cell("C1").Value = "Genres";
-        ws.Cell("D1").Value = "Availability";
-        ws.Cell("E1").Value = "Average Rating";
-        ws.Cell("F1").Value = "Total Ratings";
-        ws.Cell("G1").Value = "Mal Id";
-        ws.Cell("H1").Value = "Mal Ratings";
-        ws.Cell("I1").Value = "Mal Genres";
+        Directory.CreateDirectory(outputDirectory);
+
+        string filePath = Path.Combine(
+            outputDirectory,
+            $"Animes_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.xlsx");
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Anime");
+
+        string[] headers =
+        {
+            "CrunchyRoll Id",
+            "Title",
+            "Genres",
+            "Availability",
+            "Average Rating",
+            "Total Ratings",
+            "MAL Id",
+            "MAL Rating",
+            "MAL Genres"
+        };
+
+        for (int col = 0; col < headers.Length; col++)
+        {
+            worksheet.Cell(1, col + 1).Value = headers[col];
+        }
+
+        worksheet.Range(1, 1, 1, headers.Length).Style.Font.Bold = true;
+
+        int row = 2;
+
         foreach (var anime in currentAnimes)
         {
-            ws.Cell(i, 1).Value = anime.Id;
-            ws.Cell(i, 2).Value = anime.Title;
-            ws.Cell(i, 3).Value = anime.Genres;
-            ws.Cell(i, 4).Value = anime.Availability;
-            ws.Cell(i, 5).Value = anime.AverageRating;
-            ws.Cell(i, 6).Value = anime.TotalRatings;
+            worksheet.Cell(row, 1).Value = anime.Id;
+            worksheet.Cell(row, 2).Value = anime.Title;
+            worksheet.Cell(row, 3).Value = anime.Genres;
+            worksheet.Cell(row, 4).Value = anime.Availability;
+
+            if (anime.AverageRating.HasValue)
+                worksheet.Cell(row, 5).Value = anime.AverageRating.Value;
+
+            if (anime.TotalRatings.HasValue)
+                worksheet.Cell(row, 6).Value = anime.TotalRatings.Value;
+
+            worksheet.Cell(row, 7).Value = anime.MalId;
+
+            if (anime.MalRating.HasValue)
+                worksheet.Cell(row, 8).Value = anime.MalRating.Value;
+
+            worksheet.Cell(row, 9).Value = anime.MalGenres;
+
+            row++;
         }
-        wbook.SaveAs("Animes.xlsx");
+
+        worksheet.SheetView.FreezeRows(1);
+        worksheet.RangeUsed()?.SetAutoFilter();
+        worksheet.Columns().AdjustToContents();
+
+        workbook.SaveAs(filePath);
+
+        Console.WriteLine($"Excel file saved: {filePath}");
+        Console.WriteLine($"Anime exported: {currentAnimes.Count}");
     }
 }

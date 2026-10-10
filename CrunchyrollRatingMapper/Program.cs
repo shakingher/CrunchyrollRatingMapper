@@ -2,45 +2,71 @@
 using CrunchyrollRatingMapper.Services;
 using CrunchyrollRatingMapper.Utility;
 
-CrunchyrollService crunchyrollService = new CrunchyrollService();
-int finalNum = 1100;
-bool isFinalNumSet = false;
-List<AnimeInfo> animeInfos = new List<AnimeInfo>();
-for (int start = 0; start <= finalNum; start += 50)
+var crunchyrollService = new CrunchyrollService();
+var animeInfos = new List<AnimeInfo>();
+
+const int pageSize = 50;
+int finalStart = 1100; // Fallback if the API doesn't provide a total.
+bool totalDiscovered = false;
+
+for (int start = 0; start <= finalStart; start += pageSize)
 {
+    Console.WriteLine($"Fetching Crunchyroll page starting at {start}...");
+
     string json = await crunchyrollService.GetBrowsePage(start);
-    AnimeCompleteData animeCompleteData = JsonDataReader.ParseAnime(json);
-    if (animeCompleteData != null && animeCompleteData.TotalAnimes > 0 && !isFinalNumSet)
+    AnimeCompleteData page = JsonDataReader.ParseAnime(json);
+
+    if (!totalDiscovered && page.TotalAnimes > 0)
     {
-        int totalAnimes = animeCompleteData.TotalAnimes;
-        int rem = totalAnimes % 50;
-        finalNum = rem == 0 ? totalAnimes - 50 : totalAnimes - rem;
-        isFinalNumSet = true;
+        finalStart = ((page.TotalAnimes - 1) / pageSize) * pageSize;
+        totalDiscovered = true;
+
+        Console.WriteLine(
+            $"Crunchyroll reports {page.TotalAnimes} anime. " +
+            $"Last page offset: {finalStart}.");
     }
-    if (animeCompleteData != null && animeCompleteData.animes.Any())
-    {
-        animeInfos.AddRange(animeCompleteData.animes);
-    }
+
+    animeInfos.AddRange(page.animes);
+
+    Console.WriteLine(
+        $"Collected {animeInfos.Count} Crunchyroll anime so far.");
 }
 
-TenraiService tenraiService = new TenraiService();
-List<MalAnimeInfo> malAnimeInfos = new List<MalAnimeInfo>();
-int lastPage = 10;
-bool isLastPageSet = false;
+var tenraiService = new TenraiService();
+var malAnimeInfos = new List<MalAnimeInfo>();
+
+int lastPage = 1;
+
 for (int page = 1; page <= lastPage; page++)
 {
-    string malResponseString = await tenraiService.GetMALAnimes(page);
-    var malResponse = JsonDataReader.ParseMalAnime(malResponseString);
-    if (malResponse.LastVisiblePage > 0 && !isLastPageSet)
+    Console.WriteLine($"Fetching MAL page {page}...");
+
+    string json = await tenraiService.GetMALAnimes(page);
+    var result = JsonDataReader.ParseMalAnime(json);
+
+    // The first response tells us how many pages are available.
+    if (page == 1)
     {
-        lastPage = malResponse.LastVisiblePage;
-        isLastPageSet = true;
+        lastPage = Math.Max(1, result.LastVisiblePage);
+        Console.WriteLine($"MAL reports {lastPage} pages.");
     }
-    if (malResponse.Animes != null && malResponse.Animes.Any())
-    {
-        malAnimeInfos.AddRange(malResponse.Animes);
-    }
+
+    malAnimeInfos.AddRange(result.Animes);
+
+    Console.WriteLine(
+        $"Collected {malAnimeInfos.Count} MAL anime so far.");
 }
-List<AnimeInfo> finalList = await CRMalMapper.MapResponses(animeInfos, malAnimeInfos);
+
+Console.WriteLine("Matching Crunchyroll anime to MAL...");
+
+List<AnimeInfo> finalList =
+    await CRMalMapper.MapResponses(animeInfos, malAnimeInfos);
+
+int matched = finalList.Count(a => a.IsMalPopulated);
+
+Console.WriteLine(
+    $"Matching complete: {matched}/{finalList.Count} anime matched.");
 
 ExcelBuilder.BuildExcel(finalList);
+
+Console.WriteLine("All tasks completed.");

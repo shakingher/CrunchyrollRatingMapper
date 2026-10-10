@@ -1,34 +1,45 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using CrunchyrollRatingMapper.Helpers;
 
 namespace CrunchyrollRatingMapper.Services;
 
+
 public class TenraiService
 {
-    private readonly HttpClient _httpClient;
-    public TenraiService()
+    private readonly HttpClient _httpClient = new();
+
+    public async Task<string> GetMALAnimes(
+        int page,
+        CancellationToken cancellationToken = default)
     {
-        _httpClient = new HttpClient();
+        string url =
+            "https://api.tenrai.org/v1/anime" +
+            $"?page={page}&order_by=title&sort=asc&type=tv";
+
+        using var response = await HttpRetry.SendAsync(
+            _httpClient,
+            () => new HttpRequestMessage(HttpMethod.Get, url),
+            $"Tenrai anime list (page={page})",
+            cancellationToken);
+
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    public async Task<string> GetMALAnimes(int page)
+    public async Task<string> GetMALAnimesByTitle(
+        string title,
+        CancellationToken cancellationToken = default)
     {
-        HttpRequestMessage httpRequestMessage = new HttpRequestMessage();
-        httpRequestMessage.Method = HttpMethod.Get;
-        httpRequestMessage.RequestUri = new Uri($"https://api.tenrai.org/v1/anime?page={page}&order_by=title&sort=asc&type=tv");
-        HttpResponseMessage response = await _httpClient.SendAsync(httpRequestMessage);
-        string json = await response.Content.ReadAsStringAsync();
-        return json;
-    }
+        string encodedTitle = Uri.EscapeDataString(title);
 
-    public async Task<string> GetMALAnimesByTitle(string q)
-    {
-        HttpRequestMessage httpRequestMessage = new HttpRequestMessage();
-        httpRequestMessage.Method = HttpMethod.Get;
-        httpRequestMessage.RequestUri = new Uri($"https://api.tenrai.org/v1/anime?page=1&order_by=title&sort=asc&q={q}");
-        HttpResponseMessage response = await _httpClient.SendAsync(httpRequestMessage);
-        string json = await response.Content.ReadAsStringAsync();
-        return json;
+        string url =
+            "https://api.tenrai.org/v1/anime" +
+            $"?page=1&order_by=title&sort=asc&q={encodedTitle}";
+
+        using var response = await HttpRetry.SendAsync(
+            _httpClient,
+            () => new HttpRequestMessage(HttpMethod.Get, url),
+            $"Tenrai title search ({title})",
+            cancellationToken);
+
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 }
