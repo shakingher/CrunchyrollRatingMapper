@@ -41,7 +41,7 @@ public class CRMalMapper
 
                 var match = result.Animes.FirstOrDefault(m =>
                     NormalizeTitle(m.Title) == NormalizeTitle(anime.Title) ||
-                    NormalizeTitle(m.TitleEnglish) == NormalizeTitle(anime.Title));
+                    NormalizeTitle(m.TitleEnglish) == NormalizeTitle(anime.Title)) ?? result.Animes.FirstOrDefault();
 
                 if (match is not null)
                 {
